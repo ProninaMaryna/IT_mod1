@@ -1,0 +1,13 @@
+.venv/
+**/__pycache__/
+.pytest_cache/
+data/
+docs/
+tests/
+scripts/
+web/node_modules/
+web/dist/
+.git/
+*.pdf
+.github/
+docker-compose.yml

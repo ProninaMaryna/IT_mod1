@@ -1,0 +1,26 @@
+# --- секрети / оточення ---
+.env
+.env.*
+
+# --- Python ---
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+build/
+
+# --- веб-клієнт (web/) ---
+web/node_modules/
+web/dist/
+
+# --- дані сервера та синхронізації ---
+data/
+.cloudfolder-sync.json
+
+# --- ОС / редактори ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

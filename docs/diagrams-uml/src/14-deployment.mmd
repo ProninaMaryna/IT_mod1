@@ -1,0 +1,27 @@
+flowchart LR
+    subgraph PC["«device» ПК користувача"]
+        direction TB
+        subgraph PY["«exec. env.» Python 3.11"]
+            D["«artifact»<br/>cloudfolder.desktop"]
+        end
+        subgraph BR["«exec. env.» Chrome / Edge"]
+            W["«artifact»<br/>SPA (index.html, JS, CSS)"]
+        end
+        LD[/"Локальна папка"/]
+    end
+    subgraph SRV["«device» Render · Docker"]
+        direction TB
+        subgraph UV["«exec. env.» uvicorn"]
+            A["«artifact»<br/>cloudfolder.server"]
+            ST["«artifact»<br/>web/dist"]
+        end
+        DB[("SQLite")]
+        BL[("data/blobs")]
+    end
+    D -->|"HTTPS, JSON + JWT"| A
+    W -->|"HTTPS, fetch + JWT"| A
+    W -->|"GET /"| ST
+    D --- LD
+    W -.-|"File System<br/>Access API"| LD
+    A --- DB
+    A --- BL

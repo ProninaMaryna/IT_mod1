@@ -1,0 +1,63 @@
+classDiagram
+    direction TB
+    class MainWindow {
+        <<boundary>>
+        +auto_sync: QCheckBox
+        +choose_folder()
+        +sync_now()
+    }
+    class QFileSystemWatcher {
+        <<boundary>>
+        +directoryChanged(path)
+    }
+    class SyncEngine {
+        <<control>>
+        +folder: Path
+        +run_once() SyncReport
+    }
+    class sync {
+        <<control>>
+        +plan_sync(local, remote, base)
+        +scan_folder(folder)
+        +load_base() / save_base()
+        +conflict_copy_name(name)
+    }
+    class ApiClient {
+        <<boundary>>
+        +list_files()
+        +upload(name, data)
+        +download(id)
+        +delete(id)
+    }
+    class SyncAction {
+        <<entity>>
+        +kind: SyncActionKind
+        +name: str
+    }
+    class SyncActionKind {
+        <<enumeration>>
+        UPLOAD
+        DOWNLOAD
+        DELETE_REMOTE
+        DELETE_LOCAL
+        CONFLICT
+    }
+    class SyncReport {
+        <<entity>>
+        +actions
+        +errors
+        +summary()
+    }
+    class SyncState {
+        <<entity>>
+        +account
+        +files: name → sha256
+    }
+    QFileSystemWatcher --> MainWindow : сигнал
+    MainWindow --> SyncEngine : створює
+    SyncEngine ..> sync
+    SyncEngine --> ApiClient
+    SyncEngine ..> SyncReport : повертає
+    sync ..> SyncAction
+    SyncAction --> SyncActionKind
+    sync ..> SyncState : файл стану

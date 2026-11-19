@@ -1,0 +1,29 @@
+sequenceDiagram
+    autonumber
+    participant FS as Watcher
+    participant W as MainWindow
+    participant E as SyncEngine
+    participant SY as core.sync
+    participant C as ApiClient
+    participant API as Сервер
+    FS->>W: directoryChanged
+    W->>W: затримка 1,5 с
+    W->>E: run_once()
+    E->>SY: scan_folder()
+    SY-->>E: local
+    E->>C: list_files()
+    C->>API: GET /api/files
+    API-->>C: remote
+    E->>SY: load_base()
+    E->>SY: plan_sync()
+    SY-->>E: план дій
+    E->>C: upload(a.xml)
+    C->>API: POST /api/files
+    E->>C: download(b.png)
+    C->>API: GET content
+    E->>E: атомарний запис b.png
+    E->>C: upload(c (конфлікт).xml)
+    E->>C: download(c.xml)
+    E->>SY: save_base()
+    E-->>W: SyncReport
+    W->>W: журнал, refresh()

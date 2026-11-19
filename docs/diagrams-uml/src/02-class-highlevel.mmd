@@ -1,0 +1,71 @@
+classDiagram
+    direction LR
+    class User {
+        +int id
+        +str username
+        +str password_hash
+        +datetime created_at
+    }
+    class FileRecord {
+        +int id
+        +str name
+        +int size
+        +str sha256
+        +datetime created_at
+        +datetime modified_at
+        +str uploaded_by
+        +str edited_by
+        +extension() str
+    }
+    class AuthService {
+        +register(user, pwd) str
+        +login(user, pwd) str
+        +authenticate(token)
+    }
+    class FileService {
+        +list(owner, sort, order, type)
+        +upload(owner, user, name, data)
+        +content(owner, id)
+        +delete(owner, id)
+    }
+    class UserRepo {
+        +create(name, hash) int
+        +by_username(name)
+    }
+    class FileRepo {
+        +list(owner)
+        +by_name(owner, name)
+        +insert(...)
+        +update_content(...)
+        +delete(id)
+    }
+    class FileStorage {
+        <<interface>>
+        +save(data) str
+        +load(key) bytes
+        +delete(key)
+    }
+    class LocalFileStorage {
+        +root: Path
+    }
+    class Database {
+        +execute(sql, params)
+        +query(sql, params)
+    }
+    class variant {
+        <<module>>
+        +PREVIEW: .xml, .png
+        +FILTER: .java, .png
+        +sort_files()
+        +filter_files()
+        +preview_kind()
+    }
+    User "1" --> "0..*" FileRecord : володіє
+    AuthService --> UserRepo
+    FileService --> FileRepo
+    FileService --> FileStorage
+    FileService ..> variant
+    FileStorage <|.. LocalFileStorage
+    UserRepo --> Database
+    FileRepo --> Database
+    FileRepo ..> FileRecord : створює

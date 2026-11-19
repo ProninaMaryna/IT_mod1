@@ -1,0 +1,23 @@
+stateDiagram-v2
+    state "Не автентифіковано" as NA
+    state "Перевірка даних" as CHK
+    state "Автентифіковано" as AU {
+        state "Список файлів" as LIST
+        state "Перегляд вмісту" as PREV
+        state "Файлова операція" as OP
+        state "Синхронізація" as SYNC
+        [*] --> LIST
+        LIST --> LIST: сортування, фільтр
+        LIST --> PREV: клік .xml / .png
+        PREV --> LIST: закрити
+        LIST --> OP: файлова дія
+        OP --> LIST: готово
+        LIST --> SYNC: тригер
+        SYNC --> LIST: звіт
+    }
+    [*] --> NA
+    NA --> CHK: увійти
+    CHK --> NA: 401 / 409
+    CHK --> AU: JWT
+    AU --> NA: вийти / 401
+    NA --> [*]

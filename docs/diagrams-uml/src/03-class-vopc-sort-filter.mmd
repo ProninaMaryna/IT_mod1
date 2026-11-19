@@ -1,0 +1,57 @@
+classDiagram
+    direction TB
+    class MainWindow {
+        <<boundary>>
+        +filter_combo
+        +sort_combo
+        +table: DropTable
+        +_header_clicked(index)
+        +render_table()
+    }
+    class FilesView {
+        <<boundary>>
+        +typeFilter
+        +sort
+        +headerClick(key)
+    }
+    class FilesViewModel {
+        <<control>>
+        +sort_attribute: str
+        +sort_order: SortOrder
+        +type_filter: str
+        +toggle_sort(attr)
+        +set_filter(value)
+        +displayed_files()
+    }
+    class variant {
+        <<control>>
+        +SORT_ATTR = modified_at
+        +FILTER = .java, .png
+        +sort_files()
+        +filter_files()
+        +sort_and_filter()
+    }
+    class SortOrder {
+        <<enumeration>>
+        NONE
+        ASC
+        DESC
+        +next()
+    }
+    class ApiClientProtocol {
+        <<interface>>
+        +list_files()
+    }
+    class FileRecord {
+        <<entity>>
+        +name
+        +modified_at
+        +extension()
+    }
+    MainWindow --> FilesViewModel
+    FilesView ..> variant : variant.js
+    FilesViewModel --> ApiClientProtocol
+    FilesViewModel ..> variant
+    variant ..> SortOrder
+    variant ..> FileRecord
+    ApiClientProtocol ..> FileRecord

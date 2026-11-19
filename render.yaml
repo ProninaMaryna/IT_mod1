@@ -1,0 +1,13 @@
+# Render Blueprint: один веб-сервіс (Docker), що обслуговує REST API та веб-клієнт.
+# Безкоштовний тариф не має постійного диска: база SQLite і файли зберігаються
+# до перезапуску / повторного розгортання сервісу.
+services:
+  - type: web
+    name: cloud-folder
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/variant
+    envVars:
+      - key: CLOUDFOLDER_SECRET
+        generateValue: true

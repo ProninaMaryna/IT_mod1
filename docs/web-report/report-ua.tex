@@ -1,0 +1,270 @@
+\documentclass[12pt,a4paper]{article}
+
+% ---------- Мова та шрифти ----------
+\usepackage{fontspec}
+\usepackage{polyglossia}
+\setmainlanguage{ukrainian}
+\setotherlanguage{english}
+\setmainfont{DejaVu Serif}
+\setsansfont{DejaVu Sans}
+\setmonofont{DejaVu Sans Mono}
+
+% ---------- Компонування ----------
+\usepackage[a4paper,margin=2.2cm]{geometry}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{longtable}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{amssymb}
+\usepackage{fancyvrb}
+
+\hypersetup{colorlinks=true, linkcolor=blue!50!black, urlcolor=blue!50!black,
+    pdftitle={Звіт про веб-версію --- Хмарне сховище}, pdfauthor={Проніна Марина}}
+
+\titleformat{\section}{\normalfont\Large\bfseries}{\thesection.}{0.6em}{}
+\titleformat{\subsection}{\normalfont\large\bfseries}{\thesubsection}{0.6em}{}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.6em}
+
+\newcommand{\fig}[4]{%
+    \begin{figure}[H]
+        \centering
+        \includegraphics[width=#3\linewidth,height=0.85\textheight,keepaspectratio]{#1}
+        \caption{#2}
+        \label{#4}
+    \end{figure}
+}
+
+\begin{document}
+\begin{titlepage}
+\centering\large
+\textbf{Київський національний університет імені Тараса Шевченка}\\
+Факультет комп'ютерних наук та кібернетики
+\vspace*{\stretch{1}}
+
+\textbf{Звіт}\\
+з дисципліни “Інформаційні Технології”\\
+до Практичного завдання -- модуль 1\\
+Варіант 1.2\\
+“Етап 3. Розробка веб-орієнтованої версії”
+\vspace*{\stretch{1}}
+
+\begin{flushright}
+Студентки 4 курсу\\
+групи МІ-41\\
+спеціальності 122 "Комп’ютерні науки"\\
+Проніної Марини
+\end{flushright}
+\vspace*{\stretch{1.5}}
+
+\textbf{Київ \the\year}
+\end{titlepage}
+
+\begin{abstract}
+\noindent
+Звіт документує \textbf{веб-клієнт} проєкту «Хмарне сховище» (\texttt{web/\allowbreak{}}) --- односторінковий застосунок (SPA) на Vue 3, зібраний Vite, що працює з тим самим REST API на FastAPI, що й десктоп-клієнт. Описано обрану технологію та архітектуру, прецеденти зі скріншотами (включно з операцією варіанта 12, перетягуванням файлів і синхронізацією папки через File System Access API), тестування (14 тестів Vitest) і публічне розгортання (Docker, Render).
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+
+% =====================================================================
+\section{Вибір технології}
+% =====================================================================
+
+Для веб-версії обрано архітектуру \textbf{REST API + SPA}: сервер (FastAPI) лише надає JSON-API та роздає статичні файли, а весь інтерфейс виконується у браузері. Альтернативи розглядалися так:
+
+{\small
+\begin{longtable}{@{}p{3.6cm}p{4.2cm}p{5.4cm}p{2.0cm}@{}}
+\caption{Порівняння варіантів веб-технології}\\
+\toprule
+\textbf{Варіант} & \textbf{Переваги} & \textbf{Недоліки} & \textbf{Рішення} \\
+\midrule
+\endhead
+Моноліт з серверним рендерингом (Jinja2) & простота, без JS-збірки & перезавантаження сторінки на кожну дію, складно зробити drag-n-drop і синхронізацію & ні \\ \midrule
+REST + SPA (Vue 3) & один API для обох клієнтів, швидкий інтерфейс, доступ до File System Access API & потрібна збірка (Vite) & \textbf{так} \\ \midrule
+GraphQL & гнучкі запити & надмірний для 6 простих ендпойнтів, незручне вивантаження файлів & ні \\ \midrule
+gRPC-Web & строга схема, ефективність & потрібен проксі, браузерна підтримка обмежена & ні \\ \midrule
+\bottomrule
+\end{longtable}}
+
+Vue 3 (Composition API) обрано як легкий реактивний фреймворк без зайвих залежностей: збірка займає ≈ 87 КБ JS (34 КБ gzip). Вибір REST дозволив повторно використати сервер, створений для десктоп-клієнта, без змін.
+
+
+% =====================================================================
+\section{Архітектура веб-клієнта}
+% =====================================================================
+
+{\small
+\begin{longtable}{@{}p{5cm}p{11cm}@{}}
+\caption{Модулі веб-клієнта}\\
+\toprule
+\textbf{Модуль} & \textbf{Відповідальність} \\
+\midrule
+\endhead
+\texttt{App.vue} & перемикання між екраном входу та робочою областю \\ \midrule
+\texttt{components/\allowbreak{}LoginView.vue} & вхід і реєстрація, показ помилок сервера \\ \midrule
+\texttt{components/\allowbreak{}FilesView.vue} & таблиця, меню «Стовпці», фільтр, сортування, вивантаження/завантаження/видалення, зона drag-n-drop \\ \midrule
+\texttt{components/\allowbreak{}PreviewModal.vue} & перегляд \texttt{.xml} як тексту і \texttt{.png} як зображення (через \texttt{Blob} та \texttt{URL.createObjectURL}) \\ \midrule
+\texttt{components/\allowbreak{}SyncPanel.vue} & вибір папки, ручна та періодична синхронізація, журнал \\ \midrule
+\texttt{lib/\allowbreak{}api.js} & REST-клієнт на \texttt{fetch}, JWT у \texttt{sessionStorage}, обробка 401 \\ \midrule
+\texttt{lib/\allowbreak{}variant.js} & правила варіанта 12 --- дзеркало \texttt{core/\allowbreak{}variant.py} \\ \midrule
+\texttt{lib/\allowbreak{}sync.js} & \texttt{planSync} (той самий алгоритм, що й \texttt{core/\allowbreak{}sync.py}) + виконання через File System Access API \\ \midrule
+\bottomrule
+\end{longtable}}
+
+Продакшн-збірка (\texttt{npm run build}) кладеться у \texttt{web/\allowbreak{}dist}, і сервер FastAPI роздає її на \texttt{/\allowbreak{}}, тож веб-клієнт і API працюють на одному порту без CORS. Для розробки є \texttt{npm run dev} (Vite, порт 5173) з проксі \texttt{/\allowbreak{}api} $\to$ \texttt{:8000}.
+
+\begin{Verbatim}[fontsize=\small,frame=single]
+cd web
+npm install
+npm run build          # збірка у web/dist
+npm test               # Vitest
+cd ..
+.venv\Scripts\python -m cloudfolder.server --port 8000
+# відкрити http://127.0.0.1:8000/
+\end{Verbatim}
+
+
+% =====================================================================
+\section{Прецеденти використання та скріншоти}
+% =====================================================================
+
+\subsection{Вхід і реєстрація}
+
+\fig{img/screenshots/01-login.png}{Сторінка входу}{0.8}{fig:1}
+
+\fig{img/screenshots/02-register-error.png}{Реєстрація з уже зайнятим логіном --- повідомлення сервера}{0.8}{fig:2}
+
+\subsection{Список файлів і стовпці}
+
+Інтерфейс виконано в класичному стилі: прямі кути, тонкі рамки, таблиця із сіткою та чергуванням рядків, без тіней і декоративних піктограм. Таблиця показує всі атрибути файлу та позначку розширення; типи з переглядом вмісту (\texttt{.xml}, \texttt{.png}) виділено синьою рамкою. Меню «Стовпці» приховує будь-який стовпець, крім «Ім'я» (рис. 4).
+
+\fig{img/screenshots/03-file-list-overview.png}{Список файлів}{0.95}{fig:3}
+
+\fig{img/screenshots/04-column-visibility.png}{Меню «Стовпці»: приховано «Створено» та «Вивантажив»}{0.95}{fig:4}
+
+\subsection{Операція варіанта: сортування за датою модифікації}
+
+\fig{img/screenshots/05-sort-modified-asc.png}{Сортування за датою модифікації $\blacktriangle$}{0.95}{fig:5}
+
+\fig{img/screenshots/06-sort-modified-desc.png}{Сортування за датою модифікації $\blacktriangledown$}{0.95}{fig:6}
+
+\subsection{Операція варіанта: фільтр «усі / .java / .png»}
+
+\fig{img/screenshots/07-filter-java.png}{Фільтр «Лише .java»}{0.95}{fig:7}
+
+\fig{img/screenshots/08-filter-png.png}{Фільтр «Лише .png»}{0.95}{fig:8}
+
+\subsection{Перегляд вмісту}
+
+\fig{img/screenshots/09-preview-xml.png}{Перегляд .xml як тексту}{0.95}{fig:9}
+
+\fig{img/screenshots/10-preview-png.png}{Перегляд .png як зображення}{0.95}{fig:10}
+
+\subsection{Drag-n-drop, вивантаження, завантаження, видалення}
+
+Перетягування файлів у вікно браузера показує напівпрозору зону скидання (рис. 11), після чого файли вивантажуються (рис. 12). Завантаження зберігає файл стандартними засобами браузера, видалення підтверджується діалогом.
+
+\fig{img/screenshots/11-drag-drop.png}{Зона скидання при перетягуванні файлів (бонус drag-n-drop)}{0.95}{fig:11}
+
+\fig{img/screenshots/12-upload.png}{Файл web.xml вивантажено перетягуванням}{0.95}{fig:12}
+
+\fig{img/screenshots/13-download.png}{Завантаження обраного файлу}{0.95}{fig:13}
+
+\fig{img/screenshots/14-delete.png}{Список після видалення}{0.95}{fig:14}
+
+\subsection{Синхронізація папки у браузері}
+
+У Chrome та Edge веб-клієнт синхронізує локальну папку через \textbf{File System Access API} (\texttt{showDirectoryPicker}), використовуючи той самий алгоритм і той самий файл стану \texttt{.cloudfolder-sync.json}, що й десктоп-клієнт, тож одну папку можна по черзі синхронізувати обома клієнтами. Є ручний режим і періодичний (кожні 10 с). У браузерах без цього API (Firefox, Safari) панель повідомляє, що синхронізація доступна в десктоп-клієнті.
+
+\fig{img/screenshots/15-sync.png}{Перша синхронізація папки у браузері}{0.95}{fig:15}
+
+\fig{img/screenshots/16-sync-conflict.png}{Конфлікт: збережено обидві версії файлу}{0.95}{fig:16}
+
+\subsection{Адаптивність}
+
+Інтерфейс адаптується до вузьких екранів: панель дій переноситься на кілька рядків, таблиця прокручується горизонтально (рис. 17). Підтримується також темна тема ОС через \texttt{prefers-color-scheme}.
+
+\fig{img/screenshots/17-mobile.png}{Веб-клієнт на екрані смартфона (390 px)}{0.4}{fig:17}
+
+
+% =====================================================================
+\section{Тестування}
+% =====================================================================
+
+Логіка веб-клієнта покрита 14 тестами Vitest (\texttt{web/\allowbreak{}tests/\allowbreak{}}); тестові дані й очікувані результати збігаються з тестами Python, що гарантує однакову поведінку обох клієнтів.
+
+{\small
+\begin{longtable}{@{}p{4cm}p{1.3cm}p{10.7cm}@{}}
+\caption{Набори тестів веб-клієнта}\\
+\toprule
+\textbf{Файл} & \textbf{К-сть} & \textbf{Що перевіряє} \\
+\midrule
+\endhead
+\texttt{variant.test.js} & 10 & сортування за датою модифікації $\blacktriangle$/$\blacktriangledown$/none (без мутації вхідного масиву), цикл порядку, фільтр усі/.java/.png, відхилення інших типів, комбінація, тип перегляду \\ \midrule
+\texttt{sync.test.js} & 4 & \texttt{planSync} для нових/змінених/видалених файлів і конфліктів; SHA-256 у браузері збігається з \texttt{hashlib} Python \\ \midrule
+\bottomrule
+\end{longtable}}
+
+\begin{Verbatim}[fontsize=\small,frame=single]
+> npm test
+ ✓ tests/variant.test.js (10 tests)
+ ✓ tests/sync.test.js (4 tests)
+ Test Files  2 passed (2)
+      Tests  14 passed (14)
+\end{Verbatim}
+
+
+% =====================================================================
+\section{Розгортання}
+% =====================================================================
+
+Сервер і веб-клієнт розгортаються як \textbf{один Docker-образ} (\texttt{Dockerfile}, двоетапна збірка): на першому етапі образ \texttt{node:20-alpine} збирає SPA (\texttt{npm run build}), на другому \texttt{python:3.11-slim} встановлює лише серверні залежності з \texttt{pyproject.toml} (без PySide6) і запускає \texttt{python -m cloudfolder.server}. FastAPI роздає і REST API (\texttt{/\allowbreak{}api/\allowbreak{}*}), і зібраний SPA (\texttt{/\allowbreak{}}), тому CORS не потрібен. Змінна \texttt{CLOUDFOLDER\_SECRET} задає ключ підпису JWT, \texttt{CLOUDFOLDER\_DATA} --- каталог із базою SQLite та вмістом файлів.
+
+{\small
+\begin{longtable}{@{}p{3.4cm}p{3.8cm}p{5.0cm}p{4.0cm}@{}}
+\caption{Способи розгортання}\\
+\toprule
+\textbf{Спосіб} & \textbf{Файл} & \textbf{Призначення} & \textbf{Збереження даних} \\
+\midrule
+\endhead
+Публічний сервіс Render & \texttt{render.yaml} (Blueprint) & публікація сервера в інтернеті з HTTPS & лише до перезапуску (безкоштовний тариф) \\ \midrule
+Docker Compose & \texttt{docker-compose.yml} & запуск однією командою на будь-якому ПК чи VPS & постійно, у томі \texttt{cloudfolder-data} \\ \midrule
+Локальний запуск & \texttt{python -m cloudfolder.server} & розробка й демонстрація & постійно, у \texttt{data/\allowbreak{}} \\ \midrule
+\bottomrule
+\end{longtable}}
+
+\subsection{Публікація в інтернеті (Render)}
+
+Для публічного доступу використано хмарну платформу \textbf{Render}: файл \texttt{render.yaml} описує веб-сервіс типу Docker, перевірку стану (\texttt{healthCheckPath: /\allowbreak{}api/\allowbreak{}variant}) і автоматично згенерований \texttt{CLOUDFOLDER\_SECRET}. Після підключення репозиторію (New $\to$ Blueprint) Render збирає образ і видає HTTPS-адресу; кожен push у гілку \texttt{main} запускає повторне розгортання.
+
+Публічна адреса: \textbf{https://cloud-folder.onrender.com}. Вихідний код: \textbf{https://github.com/ProninaMaryna/IT\_mod1}.
+
+Обмеження безкоштовного тарифу, які враховано:
+
+\begin{itemize}[nosep]
+    \item диск сервісу тимчасовий --- база й файли зберігаються лише до перезапуску чи нового розгортання; для постійного зберігання передбачено варіант Docker Compose з томом (або платний диск Render);
+    \item після ≈ 15 хв без запитів сервіс засинає, і перший запит виконується ≈ 30--60 с; перед демонстрацією достатньо один раз відкрити сторінку.
+\end{itemize}
+
+\subsection{Неперервна інтеграція}
+
+Файл \texttt{.github/\allowbreak{}workflows/\allowbreak{}tests.yml} (GitHub Actions) на кожен push запускає три завдання: 40 тестів pytest, 14 тестів Vitest із продакшн-збіркою SPA, а також збирання Docker-образу з перевіркою, що контейнер відповідає на \texttt{/\allowbreak{}api/\allowbreak{}variant}. Так на Render потрапляє лише код, який пройшов перевірку.
+
+
+% =====================================================================
+\section{Висновки}
+% =====================================================================
+
+Веб-версія реалізує ті самі прецеденти, що й десктоп-клієнт, з тим самим сервером і тими самими правилами варіанта 12; додатково вона працює без встановлення та адаптується до мобільних екранів, а drag-n-drop реалізовано нативними подіями браузера. Синхронізація папки доступна в браузерах Chromium через File System Access API. Усі 14 тестів Vitest проходять.
+
+
+\end{document}

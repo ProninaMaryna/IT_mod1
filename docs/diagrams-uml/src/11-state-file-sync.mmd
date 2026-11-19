@@ -1,0 +1,25 @@
+stateDiagram-v2
+    direction TB
+    state "Лише локально" as LO
+    state "Лише на сервері" as RO
+    state "Синхронізовано" as SY
+    state "Змінено локально" as LC
+    state "Змінено на сервері" as RC
+    state "Конфлікт" as CF
+    state "Видалено локально" as LD
+    state "Видалено на сервері" as RD
+    [*] --> LO: створено в папці
+    [*] --> RO: з іншого клієнта
+    LO --> SY: upload
+    RO --> SY: download
+    SY --> LC: зміна в папці
+    SY --> RC: нова версія
+    LC --> SY: upload
+    RC --> SY: download
+    LC --> CF: сервер теж змінився
+    RC --> CF: папка теж змінилась
+    CF --> SY: обидві версії
+    SY --> LD: видалено в папці
+    SY --> RD: видалено на сервері
+    LD --> [*]: delete_remote
+    RD --> [*]: delete_local

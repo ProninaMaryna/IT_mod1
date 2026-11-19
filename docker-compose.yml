@@ -1,0 +1,25 @@
+# Запуск на будь-якому ПК чи VPS з Docker:  docker compose up -d --build
+# Далі відкрити http://localhost:8000. Дані (SQLite і файли) зберігаються в томі
+# "cloudfolder-data" і переживають перезапуск та перезбирання образу.
+services:
+  cloud-folder:
+    build: .
+    image: cloud-folder:latest
+    ports:
+      - "8000:8000"
+    environment:
+      CLOUDFOLDER_DATA: /app/data
+      # Постійний ключ JWT можна задати в .env поруч із цим файлом;
+      # інакше сервер згенерує його сам і збереже в томі.
+      CLOUDFOLDER_SECRET: ${CLOUDFOLDER_SECRET:-}
+    volumes:
+      - cloudfolder-data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/variant')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  cloudfolder-data:

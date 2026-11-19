@@ -1,0 +1,27 @@
+sequenceDiagram
+    autonumber
+    actor U as Користувач
+    participant V as Вікно входу
+    participant C as ApiClient
+    participant H as /api/auth
+    participant A as AuthService
+    participant R as UserRepo
+    U->>V: логін, пароль
+    V->>C: login()
+    C->>H: POST /login
+    H->>A: login()
+    A->>R: by_username()
+    R-->>A: користувач / None
+    alt невірні дані
+        A-->>H: ServiceError 401
+        H-->>C: 401
+        C-->>V: ApiError
+        V-->>U: повідомлення
+    else успіх
+        A->>A: PBKDF2, JWT
+        A-->>H: token
+        H-->>C: 200 {token}
+        C->>C: зберегти токен
+        C-->>V: username
+        V-->>U: головне вікно
+    end

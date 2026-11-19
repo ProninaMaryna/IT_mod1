@@ -1,0 +1,251 @@
+\documentclass[12pt,a4paper]{article}
+
+% ---------- Мова та шрифти ----------
+\usepackage{fontspec}
+\usepackage{polyglossia}
+\setmainlanguage{ukrainian}
+\setotherlanguage{english}
+\setmainfont{DejaVu Serif}
+\setsansfont{DejaVu Sans}
+\setmonofont{DejaVu Sans Mono}
+
+% ---------- Компонування ----------
+\usepackage[a4paper,margin=2.2cm]{geometry}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{longtable}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{amssymb}
+\usepackage{fancyvrb}
+
+\hypersetup{colorlinks=true, linkcolor=blue!50!black, urlcolor=blue!50!black,
+    pdftitle={Звіт про десктоп-клієнт --- Хмарне сховище}, pdfauthor={Проніна Марина}}
+
+\titleformat{\section}{\normalfont\Large\bfseries}{\thesection.}{0.6em}{}
+\titleformat{\subsection}{\normalfont\large\bfseries}{\thesubsection}{0.6em}{}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.6em}
+
+\newcommand{\fig}[4]{%
+    \begin{figure}[H]
+        \centering
+        \includegraphics[width=#3\linewidth,height=0.85\textheight,keepaspectratio]{#1}
+        \caption{#2}
+        \label{#4}
+    \end{figure}
+}
+
+\begin{document}
+\begin{titlepage}
+\centering\large
+\textbf{Київський національний університет імені Тараса Шевченка}\\
+Факультет комп'ютерних наук та кібернетики
+\vspace*{\stretch{1}}
+
+\textbf{Звіт}\\
+з дисципліни “Інформаційні Технології”\\
+до Практичного завдання -- модуль 1\\
+Варіант 1.2\\
+“Етап 2. Розробка десктоп-версії (десктоп-клієнта)”
+\vspace*{\stretch{1}}
+
+\begin{flushright}
+Студентки 4 курсу\\
+групи МІ-41\\
+спеціальності 122 "Комп’ютерні науки"\\
+Проніної Марини
+\end{flushright}
+\vspace*{\stretch{1.5}}
+
+\textbf{Київ \the\year}
+\end{titlepage}
+
+\begin{abstract}
+\noindent
+Звіт документує \textbf{десктоп-клієнт} проєкту «Хмарне сховище» (\texttt{cloudfolder/\allowbreak{}desktop/\allowbreak{}}) --- застосунок на Python 3.11 та PySide6 (Qt 6), що працює з віддаленим сервером через REST API. Розглянуто архітектуру клієнта, усі прецеденти зі скріншотами працюючої програми (включно з операцією варіанта 12: сортування за датою модифікації $\blacktriangle$/$\blacktriangledown$ і фільтр «усі / .java / .png», перегляд \texttt{.xml}/\texttt{.png}, drag-n-drop) та модульне тестування: 40 тестів pytest, усі проходять.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+
+% =====================================================================
+\section{Вступ}
+% =====================================================================
+
+Десктоп-клієнт --- один із двох клієнтів (другий --- веб-клієнт на Vue 3) до спільного сервера FastAPI. Він реалізує всі прецеденти системи типу 2: реєстрацію та вхід, перегляд файлів з атрибутами й керуванням стовпцями, сортування і фільтрацію за варіантом, перегляд вмісту, вивантаження (зокрема перетягуванням файлів із провідника), завантаження, видалення та двосторонню синхронізацію локальної папки --- вручну або автоматично за подіями файлової системи.
+
+\subsection{Запуск}
+
+\begin{Verbatim}[fontsize=\small,frame=single]
+python -m venv .venv
+.venv\Scripts\pip install -e ".[desktop,dev]"
+.venv\Scripts\python -m cloudfolder.server --port 8000      # сервер
+.venv\Scripts\python -m cloudfolder.desktop --server http://127.0.0.1:8000
+.venv\Scripts\python -m pytest                            # тести
+\end{Verbatim}
+
+
+% =====================================================================
+\section{Архітектура десктоп-клієнта}
+% =====================================================================
+
+Код клієнта розділено за принципом MVVM: подання (Qt-віджети) не містять бізнес-логіки, вона зосереджена у view-моделі та спільному ядрі, які не залежать від Qt і тому тестуються звичайним pytest.
+
+{\small
+\begin{longtable}{@{}p{4.5cm}p{11.5cm}@{}}
+\caption{Модулі десктоп-клієнта}\\
+\toprule
+\textbf{Модуль} & \textbf{Відповідальність} \\
+\midrule
+\endhead
+\texttt{login\_dialog.py} & вікно входу/реєстрації, вибір адреси сервера, показ помилок валідації \\ \midrule
+\texttt{main\_window.py} & головне вікно: панель дій, меню «Стовпці», фільтр, сортування, таблиця з drag-n-drop, панель перегляду, панель синхронізації \\ \midrule
+\texttt{viewmodel.py} & \texttt{FilesViewModel}: список файлів, стан сортування/фільтра/стовпців, операції \\ \midrule
+\texttt{api\_client.py} & \texttt{ApiClient} (httpx) і протокол \texttt{ApiClientProtocol} для підміни в тестах \\ \midrule
+\texttt{sync\_engine.py} & \texttt{SyncEngine}: виконання плану синхронізації, атомарний запис файлів, журнал \texttt{SyncReport} \\ \midrule
+\texttt{theme.py} & класична світла тема (Fusion + таблиця стилів): сірі панелі, прямі кути, однаковий вигляд незалежно від теми Windows \\ \midrule
+\texttt{core/\allowbreak{}variant.py} & правила варіанта 12 (спільні з сервером) \\ \midrule
+\texttt{core/\allowbreak{}sync.py} & тристороннє узгодження \texttt{plan\_sync}, маніфест папки, файл стану \\ \midrule
+\bottomrule
+\end{longtable}}
+
+\subsection{Синхронізація}
+
+При кожному тригері (кнопка, сигнал \texttt{QFileSystemWatcher.directoryChanged} з затримкою 1,5 с або таймер 15 с) \texttt{SyncEngine} обчислює SHA-256 файлів папки, отримує список файлів з сервера (він містить SHA-256 вмісту) і порівнює обидва знімки з базовим станом попередньої синхронізації (\texttt{.cloudfolder-sync.json} у самій папці). Так клієнт розрізняє «файл новий» і «файл видалено», а також виявляє конфлікти --- зміни з обох боків. Конфлікт розв'язується без втрати даних: локальна версія зберігається й вивантажується як \texttt{ім'я (конфлікт).ext}, віддалена --- під основним іменем. Завантажені файли пишуться через тимчасовий \texttt{.part} і \texttt{os.replace}, тож перерваний запис не пошкоджує папку.
+
+
+% =====================================================================
+\section{Прецеденти використання та скріншоти}
+% =====================================================================
+
+\subsection{Вхід і реєстрація}
+
+Вікно входу (рис. 1) дозволяє вказати адресу сервера, логін і пароль. Помилки сервера --- наприклад, закороткий логін чи пароль при реєстрації --- показуються під формою (рис. 2). Після входу клієнт зберігає JWT-токен у пам'яті та додає його до кожного запиту.
+
+\fig{img/screenshots/01-login.png}{Вікно входу}{0.55}{fig:1}
+
+\fig{img/screenshots/02-register-validation.png}{Помилка валідації при реєстрації}{0.55}{fig:2}
+
+\subsection{Список файлів і стовпці}
+
+Головне вікно (рис. 3) показує таблицю з атрибутами: ім'я, створено, змінено, вивантажив, редагував і розмір. Меню «Стовпці» (рис. 4) дозволяє приховати будь-який стовпець (зокрема й «Розмір»), крім імені --- його пункт неактивний; є також дії «Показати всі» та «Приховати всі, крім імені». На рис. 5 приховано «Створено» та «Вивантажив».
+
+\fig{img/screenshots/03-file-list-overview.png}{Головне вікно з усіма стовпцями}{0.95}{fig:3}
+
+\fig{img/screenshots/04b-columns-menu.png}{Меню «Стовпці»: стовпець імені приховати не можна}{0.35}{fig:4}
+
+\fig{img/screenshots/04-column-visibility.png}{Таблиця з прихованими стовпцями «Створено» та «Вивантажив»}{0.95}{fig:5}
+
+\subsection{Операція варіанта: сортування за датою модифікації}
+
+Сортування вмикається списком «Сортування за датою зміни» або кліком по заголовку «Змінено», який циклічно перемикає порядок none $\to$ $\blacktriangle$ $\to$ $\blacktriangledown$ $\to$ none; стрілка в заголовку показує поточний порядок (рис. 6, 7). Сортування стабільне, файли з однаковою датою впорядковуються за іменем.
+
+\fig{img/screenshots/05-sort-modified-asc.png}{Сортування за датою модифікації за зростанням}{0.95}{fig:6}
+
+\fig{img/screenshots/06-sort-modified-desc.png}{Сортування за датою модифікації за спаданням}{0.95}{fig:7}
+
+\subsection{Операція варіанта: фільтр «усі / .java / .png»}
+
+Фільтр має три значення: «Усі файли», «Лише .java», «Лише .png» (рис. 8, 9). Порівняння розширень нечутливе до регістру (\texttt{Util.JAVA} теж потрапляє у фільтр .java). Фільтр і сортування комбінуються.
+
+\fig{img/screenshots/07-filter-java.png}{Фільтр «Лише .java» разом із сортуванням $\blacktriangledown$}{0.95}{fig:8}
+
+\fig{img/screenshots/08-filter-png.png}{Фільтр «Лише .png»}{0.95}{fig:9}
+
+\subsection{Перегляд вмісту}
+
+Клік по файлу відкриває вміст у правій панелі: \texttt{.xml} --- як текст моноширинним шрифтом (рис. 10), \texttt{.png} --- як зображення з прокруткою (рис. 11). Для інших типів показується пояснення, що перегляд не передбачено варіантом, і підказка про завантаження (рис. 12).
+
+\fig{img/screenshots/09-preview-xml.png}{Перегляд файлу pom.xml як тексту}{0.95}{fig:10}
+
+\fig{img/screenshots/10-preview-png.png}{Перегляд файлу diagram.png як зображення}{0.95}{fig:11}
+
+\fig{img/screenshots/11-preview-unsupported.png}{Файл типу, перегляд якого не передбачено (.java)}{0.95}{fig:12}
+
+\subsection{Вивантаження (зокрема drag-n-drop), завантаження, видалення}
+
+Файли вивантажуються кнопкою «Вивантажити…» (вибір кількох файлів) або перетягуванням із провідника Windows на таблицю (бонусна вимога). На рис. 13 щойно вивантажений \texttt{web.xml} вже відкрито в перегляді. Подвійний клік або кнопка «Завантажити» зберігає файл на диск через стандартний діалог. Видалення вимагає підтвердження (рис. 14), після чого таблиця оновлюється (рис. 15).
+
+\fig{img/screenshots/12-upload.png}{Щойно вивантажений файл web.xml}{0.95}{fig:13}
+
+\fig{img/screenshots/13a-delete-confirm.png}{Підтвердження видалення}{0.5}{fig:14}
+
+\fig{img/screenshots/13-delete.png}{Список після видалення файлу}{0.95}{fig:15}
+
+\subsection{Синхронізація локальної папки}
+
+Панель синхронізації (рис. 16) дозволяє обрати папку, запустити синхронізацію вручну або ввімкнути автоматичний режим. Журнал показує кожну виконану дію. На рис. 17 той самий файл змінили і локально, і на сервері --- клієнт зафіксував конфлікт і зберіг обидві версії (\texttt{lab-report.xml} і \texttt{lab-report (конфлікт).xml}).
+
+\fig{img/screenshots/14-sync.png}{Перша синхронізація нової локальної папки}{0.95}{fig:16}
+
+\fig{img/screenshots/15-sync-conflict.png}{Розв'язання конфлікту зі збереженням обох версій}{0.95}{fig:17}
+
+
+% =====================================================================
+\section{Модульне тестування}
+% =====================================================================
+
+\subsection{Організація тестів}
+
+Тести написано на pytest (\texttt{tests/\allowbreak{}}). Мережеві залежності view-моделі та рушія синхронізації замінено in-memory заглушкою \texttt{FakeApi}, що реалізує \texttt{ApiClientProtocol}; тести файлової системи використовують реальні тимчасові каталоги (\texttt{tmp\_path}). Інтеграційні тести запускають справжній FastAPI-застосунок через \texttt{TestClient} з окремою тимчасовою базою, а \texttt{ApiClient} десктоп-клієнта перевіряється проти того самого застосунку через транспорт httpx --- без відкриття мережевих портів.
+
+{\small
+\begin{longtable}{@{}p{4.5cm}p{1.3cm}p{10.2cm}@{}}
+\caption{Набори модульних тестів}\\
+\toprule
+\textbf{Файл} & \textbf{К-сть} & \textbf{Що перевіряє} \\
+\midrule
+\endhead
+\texttt{test\_variant\_operations.py} & 17 & \textbf{операція варіанта}: сортування за датою модифікації $\blacktriangle$/$\blacktriangledown$/none, стабільність, фільтр усі/.java/.png (без урахування регістру, відхилення інших типів), комбінація фільтра й сортування, цикл порядку, визначення типу перегляду \\ \midrule
+\texttt{test\_sync.py} & 10 & план синхронізації для всіх випадків (нові, змінені, видалені файли, конфлікти), ім'я копії конфлікту, сканування папки, повний цикл \texttt{SyncEngine} і розв'язання конфлікту \\ \midrule
+\texttt{test\_desktop\_viewmodel.py} & 4 & неможливість приховати стовпець імені, цикл сортування кліком по заголовку, варіанти фільтра, оновлення списку після вивантаження/видалення \\ \midrule
+\texttt{test\_server\_api.py} & 9 & реєстрація/вхід і валідація, захист JWT, вивантаження/список/завантаження/видалення, повторне вивантаження як редагування, ізоляція просторів користувачів, серверні сортування й фільтр, відхилення небезпечних імен, \texttt{ApiClient} проти реального API, сховище \\ \midrule
+\textbf{Разом} & \textbf{40} &  \\ \midrule
+\bottomrule
+\end{longtable}}
+
+\subsection{Тест операції варіанта}
+
+Ключові тести операції варіанта (файл \texttt{tests/\allowbreak{}test\_variant\_operations.py}):
+
+\begin{Verbatim}[fontsize=\small,frame=single]
+def test_sort_by_modified_ascending():
+    result = sort_files(FILES, "modified_at", SortOrder.ASC)
+    assert names(result) == ["diagram.png", "logo.png", "notes.txt",
+                             "Main.java", "Util.JAVA", "config.xml"]
+
+def test_filter_java_is_case_insensitive():
+    assert names(filter_files(FILES, ".java")) == ["Main.java", "Util.JAVA"]
+
+def test_filter_and_sort_compose():
+    result = sort_and_filter(FILES, ".png", "modified_at", SortOrder.DESC)
+    assert names(result) == ["logo.png", "diagram.png"]
+\end{Verbatim}
+
+\subsection{Результат запуску}
+
+\begin{Verbatim}[fontsize=\small,frame=single]
+> .venv\Scripts\python -m pytest
+tests/test_desktop_viewmodel.py ....                         [ 10%]
+tests/test_server_api.py .........                           [ 32%]
+tests/test_sync.py ..........                                [ 57%]
+tests/test_variant_operations.py .................           [100%]
+40 passed in 6.0s
+\end{Verbatim}
+
+
+% =====================================================================
+\section{Висновки}
+% =====================================================================
+
+Десктоп-клієнт реалізує всі вимоги системи типу 2 і варіанта 12: керування стовпцями, сортування за датою модифікації за зростанням і спаданням, фільтр «усі / .java / .png», перегляд \texttt{.xml} як тексту й \texttt{.png} як зображення, вивантаження з drag-n-drop, завантаження, видалення та двосторонню синхронізацію з виявленням конфліктів. Розділення на view-модель і спільне ядро зробило логіку незалежною від Qt, тому вона покрита 40 модульними й інтеграційними тестами, які всі проходять.
+
+
+\end{document}

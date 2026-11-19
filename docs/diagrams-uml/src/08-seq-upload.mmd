@@ -1,0 +1,30 @@
+sequenceDiagram
+    autonumber
+    actor U as Користувач
+    participant V as Вікно
+    participant C as ApiClient
+    participant H as /api/files
+    participant F as FileService
+    participant R as FileRepo
+    participant S as Storage
+    U->>V: вивантажити
+    loop кожен файл
+        V->>C: upload()
+        C->>H: POST + JWT
+        H->>F: upload()
+        F->>F: SHA-256
+        F->>R: by_name()
+        alt файл уже є
+            F->>S: save()
+            F->>R: update_content()
+            F->>S: delete(old)
+        else новий
+            F->>S: save()
+            F->>R: insert()
+        end
+        F-->>H: FileRecord
+        H-->>C: 201
+    end
+    V->>C: list_files()
+    C-->>V: список
+    V-->>U: таблиця

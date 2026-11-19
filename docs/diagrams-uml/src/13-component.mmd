@@ -1,0 +1,43 @@
+flowchart TB
+    subgraph Desktop["«component» Десктоп-клієнт"]
+        direction TB
+        DUI[LoginDialog, MainWindow,<br/>PreviewPanel, DropTable]
+        DVM[FilesViewModel]
+        DSE[SyncEngine]
+        DAC[ApiClient]
+    end
+    subgraph Web["«component» Веб-клієнт"]
+        direction TB
+        WUI[LoginView, FilesView,<br/>PreviewModal, SyncPanel]
+        WLIB[variant.js, sync.js]
+        WAPI[api.js]
+    end
+    subgraph Core["«library» cloudfolder.core"]
+        direction LR
+        CV[variant]
+        CS[sync]
+        CM[models]
+    end
+    IAPI(("REST API<br/>/api/*"))
+    subgraph Server["«component» Сервер FastAPI"]
+        direction TB
+        H[app.py]
+        SV[AuthService,<br/>FileService]
+        RP[UserRepo,<br/>FileRepo]
+        ST[LocalFileStorage]
+    end
+    DB[(SQLite)]
+    BL[(blobs)]
+    DUI --> DVM --> DAC
+    DUI --> DSE --> DAC
+    DVM --> CV
+    DSE --> CS
+    WUI --> WLIB
+    WUI --> WAPI
+    DAC -- HTTP JSON --> IAPI
+    WAPI -- HTTP JSON --> IAPI
+    IAPI --- H
+    H --> SV --> RP --> DB
+    SV --> ST --> BL
+    SV --> CV
+    RP --> CM

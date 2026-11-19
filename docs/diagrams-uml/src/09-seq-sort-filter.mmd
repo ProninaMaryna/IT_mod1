@@ -1,0 +1,23 @@
+sequenceDiagram
+    autonumber
+    actor U as Користувач
+    participant W as MainWindow
+    participant VM as FilesViewModel
+    participant VR as variant
+    U->>W: фільтр «Лише .java»
+    W->>VM: set_filter(".java")
+    W->>VM: displayed_files
+    VM->>VR: sort_and_filter(.java, NONE)
+    VR-->>VM: лише *.java
+    VM-->>W: список
+    U->>W: клік «Змінено»
+    W->>VM: toggle_sort()
+    VM-->>W: ASC
+    W->>VM: displayed_files
+    VM->>VR: sort_and_filter(.java, ASC)
+    VR-->>VM: за зростанням дати
+    W-->>U: «Змінено ▲»
+    U->>W: повторний клік
+    W->>VM: toggle_sort()
+    VM-->>W: DESC
+    W-->>U: «Змінено ▼»
